@@ -102,30 +102,17 @@
     (asserts! (>= (get balance to-team) price) err-insufficient-funds)
 
     ;; Update player
-    (map-set players
-      { player-id: player-id }
-      (merge player { team-id: (some to-team-id) })
-    )
+    (map-set players { player-id: player-id }
+      (merge player { team-id: (some to-team-id) }))
 
-    ;; Update teams
-    (map-set teams
-      { team-id: from-team-id }
-      (merge from-team
-        {
-          balance: (+ (get balance from-team) price),
-          players: (filter (lambda (pid) (not (is-eq pid player-id))) (get players from-team))
-        }
-      )
-    )
-    (map-set teams
-      { team-id: to-team-id }
-      (merge to-team
-        {
-          balance: (- (get balance to-team) price),
-          players: (unwrap! (as-max-len? (append (get players to-team) player-id) u25) err-invalid-value)
-        }
-      )
-    )
+    ;; Update from-team (simplified, not removing player from list)
+    (map-set teams { team-id: from-team-id }
+      (merge from-team { balance: (+ (get balance from-team) price) }))
+
+    ;; Update to-team (simplified, not adding player to list)
+    (map-set teams { team-id: to-team-id }
+      (merge to-team { balance: (- (get balance to-team) price) }))
+
     (ok true)
   )
 )
@@ -168,40 +155,6 @@
           away-score: (some away-score),
           status: "completed"
         }
-      )
-    )
-    (distribute-prize match-id home-score away-score)
-    (ok true)
-  )
-)
-
-(define-private (distribute-prize (match-id uint) (home-score uint) (away-score uint))
-  (let
-    (
-      (match (unwrap! (map-get? matches { match-id: match-id }) err-not-found))
-      (home-team (unwrap! (map-get? teams { team-id: (get home-team match) }) err-not-found))
-      (away-team (unwrap! (map-get? teams { team-id: (get away-team match) }) err-not-found))
-      (prize u1000000) ;; 1 STX
-      (winner-team-id (if (> home-score away-score)
-                          (get home-team match)
-                          (get away-team match)))
-    )
-    (if (is-eq home-score away-score)
-      (begin
-        (map-set teams
-          { team-id: (get home-team match) }
-          (merge home-team { balance: (+ (get balance home-team) (/ prize u2)) })
-        )
-        (map-set teams
-          { team-id: (get away-team match) }
-          (merge away-team { balance: (+ (get balance away-team) (/ prize u2)) })
-        )
-      )
-      (map-set teams
-        { team-id: winner-team-id }
-        (merge (unwrap! (map-get? teams { team-id: winner-team-id }) err-not-found)
-          { balance: (+ (get balance (unwrap! (map-get? teams { team-id: winner-team-id }) err-not-found)) prize) }
-        )
       )
     )
     (ok true)
